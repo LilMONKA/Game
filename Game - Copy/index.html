@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pixel City: Megalopolis Update</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Russo+One&family=Roboto:wght@400;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #000;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Roboto', sans-serif;
+            user-select: none;
+        }
+
+        canvas { display: block; width: 100%; height: 100%; background: #2c3e50; image-rendering: pixelated; }
+        .ui-layer { position: absolute; pointer-events: none; width: 100%; height: 100%; top: 0; left: 0; }
+
+        /* HUD */
+        #hud-top-right { position: absolute; top: 20px; right: 20px; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+        #money-display { font-family: 'Russo One'; color: #2ecc71; font-size: 32px; text-shadow: 2px 2px 0px rgba(0,0,0,0.8); }
+        #wanted-box { background: rgba(0, 0, 0, 0.6); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); }
+        .wanted-stars { color: #444; font-size: 20px; text-shadow: 0 1px 2px #000; transition: 0.3s; }
+        .wanted-stars.active { color: #e74c3c; text-shadow: 0 0 10px #e74c3c; }
+
+        #hud-bottom-left { position: absolute; bottom: 30px; left: 30px; width: 250px; }
+        .stat-row { display: flex; align-items: center; margin-bottom: 8px; }
+        .stat-icon { font-weight: bold; width: 30px; text-align: center; color: white; }
+        .bar-bg { flex-grow: 1; height: 12px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); transform: skewX(-20deg); overflow: hidden; }
+        .bar-fill { height: 100%; transition: width 0.2s; }
+        #hp-fill { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+        #stamina-fill { background: linear-gradient(90deg, #f39c12, #f1c40f); }
+
+        /* WEAPON & JOB INFO */
+        #weapon-panel { display: flex; align-items: center; background: rgba(0, 0, 0, 0.7); padding: 10px 20px; border-radius: 8px; border-right: 4px solid #f1c40f; margin-top: 10px; }
+        #weapon-img-display { width: 60px; height: 40px; object-fit: contain; margin-left: 15px; }
+        #weapon-name { font-family: 'Russo One'; color: #fff; font-size: 14px; opacity: 0.8; }
+        #ammo-display { font-family: 'Russo One'; color: #f1c40f; font-size: 24px; }
+        
+        #job-panel { margin-top:10px; background:rgba(0,0,0,0.8); padding:10px; border-radius:5px; border-left:4px solid #e67e22; display:none; }
+        #job-text { color:#e67e22; font-weight:bold; font-family:'Russo One'; }
+
+        /* MAP / PAUSE MENU */
+        #pause-menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); display: none; z-index: 200; pointer-events: auto;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        #map-container { position: relative; border: 4px solid #fff; width: 600px; height: 600px; background: #111; cursor: crosshair; }
+        #map-canvas { width: 100%; height: 100%; }
+        .map-legend { display: flex; gap: 15px; margin-top: 10px; color: #fff; font-size: 14px; }
+        .legend-item span { display: inline-block; width: 15px; height: 15px; margin-right: 5px; vertical-align: middle; }
+
+        /* GYM OVERLAY */
+        #gym-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; flex-direction: column; z-index: 150; pointer-events: auto;
+        }
+        .gym-title { font-family: 'Russo One'; color: #3498db; font-size: 60px; margin-bottom: 20px; }
+        .gym-instr { color: #fff; font-size: 24px; margin-bottom: 30px; animation: pulse 0.5s infinite; }
+        .gym-stat-select { font-size: 30px; color: #f1c40f; margin-bottom: 20px; }
+        .gym-progress { width: 400px; height: 30px; background: #333; border: 2px solid #fff; margin-top: 20px; border-radius: 15px; overflow: hidden; }
+        .gym-bar { width: 0%; height: 100%; background: #2ecc71; transition: width 0.05s; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        /* MENUS */
+        #interaction-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; background: rgba(10, 10, 10, 0.95); border: 2px solid #fff; display: none; z-index: 200; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .interaction-header { background: #fff; color: #000; font-family: 'Russo One'; padding: 10px; text-align: center; font-size: 18px; }
+        .interaction-list { padding: 5px 0; }
+        .interaction-option { padding: 10px 20px; color: #888; font-weight: bold; cursor: pointer; transition: 0.1s; }
+        .interaction-option.selected { background: #e74c3c; color: #fff; padding-left: 30px; }
+        .scroll-hint { text-align: center; color: #555; font-size: 10px; padding-bottom: 5px; }
+
+        #prompt { position: absolute; top: 70%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); color: #fff; padding: 10px 20px; border-radius: 4px; border-left: 4px solid #2ecc71; font-weight: bold; font-size: 14px; display: none; }
+        .key-hint { background: #fff; color: #000; padding: 1px 6px; border-radius: 3px; font-weight: 900; margin-right: 8px; }
+
+        /* DIALOGUE & PHONE */
+        #dialogue-box { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); width: 600px; background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(10,10,10,0.98)); border-top: 3px solid #f1c40f; padding: 20px; display: none; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 50; }
+        #dialogue-speaker { color: #f1c40f; font-family: 'Russo One'; font-size: 16px; margin-bottom: 10px; text-transform: uppercase; }
+        #dialogue-text { color: #ddd; font-size: 20px; line-height: 1.4; font-weight: bold; }
+
+        #phone-ui { position: absolute; bottom: -500px; right: 50px; width: 280px; height: 500px; background: #111; border: 8px solid #333; border-radius: 20px 20px 0 0; transition: bottom 0.3s; z-index: 100; pointer-events: auto; display: flex; flex-direction: column; }
+        #phone-ui.active { bottom: 0; }
+        .phone-header { background: #222; color: #fff; padding: 15px; text-align: center; font-weight: bold; border-bottom: 1px solid #444; }
+        .phone-list { flex-grow: 1; overflow-y: auto; padding: 10px; background: #fff; }
+        .contact-item { padding: 10px; border-bottom: 1px solid #eee; color: #333; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; }
+        .contact-item:hover { background: #f0f0f0; }
+        .call-btn { color: #2ecc71; font-weight: bold; }
+
+        /* MODALS */
+        .modal-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(16, 16, 16, 0.98); border: 1px solid #333; border-top: 4px solid #2ecc71; display: none; width: 450px; z-index: 60; pointer-events: auto; }
+        .modal-header { background: #222; padding: 15px; font-family: 'Russo One'; color: #2ecc71; font-size: 22px; text-align: center; }
+        .modal-content { padding: 20px; }
+        .modal-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 12px; background: #1a1a1a; border: 1px solid #333; cursor: pointer; }
+        .modal-item:hover { background: #2a2a2a; border-color: #2ecc71; }
+        .item-price { color: #2ecc71; font-family: 'Russo One'; }
+        #bar-ui { border-top-color: #e67e22; }
+
+        /* MENU */
+        #main-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #111; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; pointer-events: auto; }
+        h1 { font-family: 'Russo One'; font-size: 80px; color: #e74c3c; text-shadow: 4px 4px 0 #000; margin-bottom: 10px; }
+        .menu-btn { padding: 15px 60px; font-family: 'Russo One'; font-size: 24px; background: transparent; color: white; border: 3px solid #fff; cursor: pointer; text-transform: uppercase; margin-bottom: 20px; }
+        .menu-btn:hover { background: #fff; color: #000; }
+        .menu-layout { display: flex; gap: 40px; align-items: flex-start; }
+        .update-log { width: 300px; height: 300px; background: rgba(255,255,255,0.1); border: 1px solid #444; padding: 15px; overflow-y: auto; color: #ccc; font-size: 14px; }
+        .update-log h3 { color: #f1c40f; margin-bottom: 10px; font-family: 'Russo One'; border-bottom: 1px solid #555; padding-bottom: 5px; }
+        .update-item { margin-bottom: 15px; }
+        .update-version { color: #e74c3c; font-weight: bold; }
+        .controls-panel { display: grid; grid-template-columns: 1fr; gap: 10px; background: rgba(0,0,0,0.6); padding: 20px; border-radius: 10px; color: #ccc; width: 300px; }
+        .key { background: #333; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="hud" class="ui-layer" style="display:none;">
+        <div id="hud-top-right">
+            <div id="money-display">$0</div>
+            <div id="wanted-box">
+                <span class="wanted-stars">★</span><span class="wanted-stars">★</span><span class="wanted-stars">★</span><span class="wanted-stars">★</span><span class="wanted-stars">★</span>
+            </div>
+            <div id="weapon-panel">
+                <div class="weapon-text"><div id="weapon-name">FISTS</div><div id="ammo-display">∞</div></div>
+                <img id="weapon-img-display" src="" style="display:none;">
+            </div>
+            <div id="job-panel">
+                <div id="job-text">DELIVER PIZZA</div>
+            </div>
+        </div>
+        <div id="hud-bottom-left">
+            <div class="stat-row"><div class="stat-icon">✚</div><div class="bar-bg"><div id="hp-fill" class="bar-fill" style="width: 100%;"></div></div></div>
+            <div class="stat-row"><div class="stat-icon">⚡</div><div class="bar-bg"><div id="stamina-fill" class="bar-fill" style="width: 100%;"></div></div></div>
+        </div>
+        <div id="prompt"></div>
+    </div>
+
+    <!-- MAP MENU -->
+    <div id="pause-menu">
+        <h2 style="color: #fff; font-family: 'Russo One'; margin-bottom: 10px;">CITY MAP (CLICK TO SET GPS)</h2>
+        <div id="map-container">
+            <canvas id="map-canvas" width="600" height="600"></canvas>
+        </div>
+        <div class="map-legend">
+            <div class="legend-item"><span style="background:#e74c3c;"></span>YOU</div>
+            <div class="legend-item"><span style="background:#3498db;"></span>GYM</div>
+            <div class="legend-item"><span style="background:#e67e22;"></span>PIZZA</div>
+            <div class="legend-item"><span style="background:#9b59b6;"></span>GUNS</div>
+            <div class="legend-item"><span style="background:#795548;"></span>BAR</div>
+        </div>
+        <div style="margin-top:20px; color:#aaa;">PRESS [M] TO RESUME</div>
+    </div>
+
+    <!-- PHONE UI -->
+    <div id="phone-ui">
+        <div class="phone-header">Contacts</div>
+        <div class="phone-list" id="contact-list">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- GYM OVERLAY -->
+    <div id="gym-overlay">
+        <div class="gym-title">TRAINING MODE</div>
+        <div class="gym-stat-select" id="gym-stat-text">Target: STRENGTH</div>
+        <div class="gym-instr">SPAM LEFT CLICK!</div>
+        <div class="gym-progress"><div id="gym-bar" class="gym-bar"></div></div>
+    </div>
+
+    <!-- INTERACTION MENU -->
+    <div id="interaction-menu">
+        <div class="interaction-header">INTERACT</div>
+        <div class="interaction-list" id="interaction-list"></div>
+        <div class="scroll-hint">SCROLL TO SELECT • SPACE TO CONFIRM</div>
+    </div>
+
+    <div id="dialogue-box">
+        <div id="dialogue-speaker">Civilian</div>
+        <div id="dialogue-text">...</div>
+    </div>
+
+    <!-- MODALS -->
+    <div id="shop-ui" class="modal-ui">
+        <div class="modal-header">AMMU-NATION</div>
+        <div class="modal-content">
+            <div class="modal-item" onclick="buyItem('ammo_pistol', 50)"><span class="item-name">Pistol Ammo (12)</span><span class="item-price">$50</span></div>
+            <div class="modal-item" onclick="buyItem('ammo_ak', 100)"><span class="item-name">AK-47 Ammo (30)</span><span class="item-price">$100</span></div>
+            <div class="modal-item" onclick="buyItem('ammo_rpg', 500)"><span class="item-name">RPG Rocket (1)</span><span class="item-price">$500</span></div>
+            <div class="modal-item" onclick="buyItem('medkit', 200)"><span class="item-name">Medkit (Full HP)</span><span class="item-price">$200</span></div>
+        </div>
+    </div>
+
+    <div id="bar-ui" class="modal-ui">
+        <div class="modal-header">THE DIVE BAR</div>
+        <div class="modal-content">
+            <div class="modal-item" onclick="buyDrink('beer', 10)"><span class="item-name">Cheap Beer</span><span class="item-price">$10</span></div>
+            <div class="modal-item" onclick="buyDrink('whiskey', 25)"><span class="item-name">Whiskey Shot</span><span class="item-price">$25</span></div>
+            <div class="modal-item" onclick="buyDrink('vodka', 50)"><span class="item-name">Vodka Bottle (Get Wasted)</span><span class="item-price">$50</span></div>
+        </div>
+    </div>
+
+    <div id="main-menu">
+        <h1>Pixel City Rampage</h1>
+        <button class="menu-btn" onclick="startGame()">Play</button>
+        <div class="menu-layout">
+            <div class="controls-panel">
+                <div><span class="key">WASD</span> Move</div>
+                <div><span class="key">M</span> Map / GPS</div>
+                <div><span class="key">K</span> Phone / Crew</div>
+                <div><span class="key">G</span> Give Gun to Ally</div>
+                <div><span class="key">L-CLICK</span> Shoot / Punch</div>
+                <div><span class="key">SPACE</span> Interact / Rob</div>
+            </div>
+            <div class="update-log">
+                <h3>UPDATE LOG</h3>
+                <div class="update-item"><span class="update-version">v9.0</span><br>- <b>MAP:</b> Increased to 250x250 (Massive)<br>- <b>JOBS:</b> Deliver to actual NPCs to get paid!<br>- <b>TRAFFIC:</b> Increased density for big map.<br>- <b>POLISH:</b> Fixed Pizza Job logic.</div>
+            </div>
+        </div>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// --- LOAD IMAGES ---
+const images = {
+    player: new Image(), npc2: new Image(), npc3: new Image(),
+    police: new Image(), policeNpc1: new Image(),
+    gun: new Image(), ak47: new Image(), rpg: new Image(),
+    dog: new Image(), 
+    house: new Image(), house2: new Image(), house3: new Image(),
+    gym: new Image(), insidethegym: new Image(),
+    club: new Image(), insideclub: new Image()
+};
+images.player.src = 'photos/Bloodhound.png';
+images.npc2.src = 'photos/npc2.png';
+images.npc3.src = 'photos/npc3.png';
+images.police.src = 'photos/police.png';
+images.policeNpc1.src = 'photos/police_npc1.png';
+images.gun.src = 'weapons/gun.png';
+images.ak47.src = 'weapons/ak47.png';
+images.rpg.src = 'weapons/rpg.png';
+images.dog.src = 'photos/dog.png';
+images.house.src = 'photos/house.png';
+images.house2.src = 'photos/house2.png';
+images.house3.src = 'photos/house3.png';
+images.gym.src = 'photos/gym.png';
+images.insidethegym.src = 'photos/insidethegym.png';
+images.club.src = 'photos/club.png';
+images.insideclub.src = 'photos/insideclub.png';
+
+// --- CONFIG ---
+const TILE_SIZE = 50;
+const MAP_WIDTH = 250; // MASSIVE
+const MAP_HEIGHT = 250;
+const BASE_SPEED = 4;
+const ZOOM = 2.5; 
+const Colors = { 
+    grass: '#27ae60', road: '#34495e', pavement: '#95a5a6', wall: '#7f8c8d', 
+    roof: ['#8e44ad', '#c0392b', '#d35400', '#2980b9'],
+    policeRoof: '#2980b9', pizzaRoof: '#e67e22'
+};
+
+// --- GAME STATE ---
+let game = {
+    active: false, paused: false,
+    camera: { x: 0, y: 0 },
+    keys: {}, mouse: { x: 0, y: 0, down: false },
+    map: [], buildings: [], entities: [], particles: [], bullets: [], traffic: [], trains: [], helicopters: [],
+    
+    friends: ["Mom", "Cousin Roman"], 
+    phoneOpen: false, lastSpeakTime: 0,
+    
+    gps: { x: null, y: null },
+    job: { active: false, targetX: 0, targetY: 0, customerEntity: null },
+    
+    gym: { active: false, clicks: 0, maxTime: 300, timer: 0, stats: ['STRENGTH', 'SPEED', 'SNEAKY', 'AIM'], selectedStat: 0, requiredClicks: 20 },
+    innerThought: { text: "", timer: 0 },
+
+    interaction: {
+        active: false, target: null,
+        options: [], selectedIndex: 0
+    },
+
+    dialogue: { active: false, timer: 0 },
+    player: {
+        x: 5000, y: 5000, w: 40, h: 40,
+        hp: 100, maxHp: 100, stamina: 100, money: 500, wanted: 0,
+        weapon: 'fists', ammo: { pistol: 24, ak47: 60, rpg: 2 }, clip: { pistol: 12, ak47: 30, rpg: 1 },
+        location: 'outside', buildingId: -1, buildingType: null, angle: 0,
+        stats: { strength: 0, speed: 0, sneaky: 0, aim: 0 },
+        shootCooldown: 0, drunkLevel: 0
+    }
+};
+
+const Weapons = {
+    fists: { name: 'FISTS', damage: 15, range: 45, delay: 500, type: 'melee', img: null },
+    pistol: { name: 'PISTOL', damage: 25, range: 400, delay: 300, type: 'gun', clipSize: 12, img: 'gun' },
+    ak47: { name: 'AK-47', damage: 15, range: 600, delay: 100, type: 'gun', clipSize: 30, img: 'ak47' },
+    rpg: { name: 'RPG', damage: 200, range: 800, delay: 1500, type: 'explosive', clipSize: 1, img: 'rpg' }
+};
+
+function speak(text, pitch = 1.0) {
+    if ('speechSynthesis' in window) {
+        let now = Date.now();
+        if(window.speechSynthesis.speaking && now - game.lastSpeakTime < 1000) return; 
+        window.speechSynthesis.cancel(); 
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.pitch = pitch; utterance.rate = 1.1;
+        const voices = window.speechSynthesis.getVoices();
+        const enVoice = voices.find(v => v.lang.includes('en'));
+        if (enVoice) utterance.voice = enVoice;
+        window.speechSynthesis.speak(utterance);
+        game.lastSpeakTime = now;
+    }
+}
+
+// --- MAP & TRAFFIC ---
+function generateMap() {
+    game.map = []; game.buildings = []; game.traffic = []; game.trains = [];
+    for(let y=0; y<MAP_HEIGHT; y++) { let row = []; for(let x=0; x<MAP_WIDTH; x++) row.push(0); game.map.push(row); }
+    let trackRow = 40; for(let i=0; i<MAP_WIDTH; i++) { game.map[trackRow][i] = 3; } 
+    for(let i=5; i<MAP_WIDTH; i+=12) for(let y=0; y<MAP_HEIGHT; y++) { if(y !== trackRow) game.map[y][i]=1; game.map[y][i+1]=1; }
+    for(let i=5; i<MAP_HEIGHT; i+=12) { if(i === trackRow) continue; for(let x=0; x<MAP_WIDTH; x++) { game.map[i][x]=1; game.map[i+1][x]=1; } }
+
+    let bid = 0;
+    for(let y=2; y<MAP_HEIGHT-5; y+=12) {
+        if(Math.abs(y - trackRow) < 3) continue; 
+        for(let x=2; x<MAP_WIDTH-5; x+=12) {
+            if(Math.random() > 0.3) {
+                let rnd = Math.random();
+                let type = 'house';
+                let color = Colors.roof[Math.floor(Math.random()*Colors.roof.length)];
+                let imgKey = null;
+                
+                if(rnd > 0.96) { type = 'police'; color = Colors.policeRoof; }
+                else if(rnd > 0.92) type = 'gunshop';
+                else if(rnd > 0.88) { type = 'pizza'; color = Colors.pizzaRoof; }
+                else if(rnd > 0.84) { type = 'gym'; imgKey = 'gym'; }
+                else if(rnd > 0.80) { type = 'club'; imgKey = 'club'; }
+                else if(rnd > 0.76) { type = 'bar'; color = Colors.barRoof; }
+                else {
+                    let r = Math.random();
+                    if(r < 0.33) imgKey = 'house'; else if(r < 0.66) imgKey = 'house2'; else imgKey = 'house3';
+                }
+                
+                let w = 6, h = 4;
+                game.buildings.push({
+                    id: bid++, x: (x+2)*TILE_SIZE, y: (y+2)*TILE_SIZE, w: w*TILE_SIZE, h: h*TILE_SIZE,
+                    doorX: (x+2+w/2)*TILE_SIZE, doorY: (y+2+h)*TILE_SIZE, type: type, color: color, imgKey: imgKey
+                });
+                for(let by=0; by<h; by++) for(let bx=0; bx<w; bx++) game.map[y+2+by][x+2+bx] = 2;
+            }
+        }
+    }
+    game.trains.push({x: 0, y: trackRow * TILE_SIZE, w: 200, h: 40, speed: 12});
+    for(let i=0; i<60; i++) { // More cars for bigger map
+        let isVert = Math.random() > 0.5;
+        let roadIdx = 5 + Math.floor(Math.random() * ((isVert?MAP_WIDTH:MAP_HEIGHT)/12)) * 12;
+        if(isVert && roadIdx === trackRow) roadIdx += 12; 
+        game.traffic.push({
+            x: isVert ? roadIdx*TILE_SIZE + 10 : Math.random()*MAP_WIDTH*TILE_SIZE,
+            y: isVert ? Math.random()*MAP_HEIGHT*TILE_SIZE : roadIdx*TILE_SIZE + 10,
+            w: isVert ? 30 : 50, h: isVert ? 50 : 30,
+            vx: isVert ? 0 : (Math.random()>0.5?3:-3),
+            vy: isVert ? (Math.random()>0.5?3:-3) : 0,
+            color: ['#e74c3c', '#3498db', '#f1c40f', '#fff'][Math.floor(Math.random()*4)]
+        });
+    }
+}
+
+// --- ENTITIES ---
+class Entity {
+    constructor(x, y, type) {
+        this.x = x; this.y = y; this.w = 40; this.h = 40;
+        this.type = type; this.hp = type === 'police' ? 80 : 40;
+        this.dead = false; this.speed = 2; this.angle = 0;
+        if (type === 'police') this.imgKey = Math.random()>0.5 ? 'police' : 'policeNpc1';
+        else if (type === 'dog') { this.imgKey = 'dog'; this.w = 30; this.h = 20; this.speed = 3; }
+        else if (type === 'ally') { this.imgKey = Math.random()>0.5 ? 'npc2' : 'npc3'; this.hp = 100; }
+        else this.imgKey = Math.random()>0.5 ? 'npc2' : 'npc3';
+        this.state = 'idle'; this.target = null;
+        this.weapon = type === 'police' ? 'pistol' : 'fists';
+        if(type === 'dog') this.weapon = 'fists';
+        this.shootTimer = 0; this.bravery = Math.random(); this.pitch = 0.5 + Math.random(); 
+        this.barkCooldown = Math.random() * 500 + 300; 
+    }
+    update() {
+        if(this.dead) return;
+        if(game.interaction.active && game.interaction.target === this) return;
+        
+        if(this.type === 'dog') {
+            this.barkCooldown--;
+            if(this.barkCooldown <= 0) {
+                if(game.player.location === 'outside' || this.isIndoorDog) showDialogue("Dog", Math.random()>0.5?"WOOF!":"GRRR!", 1000, this);
+                this.barkCooldown = Math.random() * 800 + 400; 
+            }
+        }
+        
+        if(this.state === 'waiting') return; // Waiting for pizza
+
+        if(this.type === 'ally') {
+            let distToPlayer = Math.hypot(this.x - game.player.x, this.y - game.player.y);
+            if(distToPlayer > 80 && this.state !== 'attack') {
+                this.angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
+                let nx = this.x + Math.cos(this.angle) * this.speed;
+                let ny = this.y + Math.sin(this.angle) * this.speed;
+                if(!checkWallCollision(nx, ny)) { this.x = nx; this.y = ny; }
+            }
+            if(this.state !== 'attack') {
+                game.entities.forEach(enemy => {
+                    if(enemy.type === 'police' || (enemy.state === 'attack' && enemy.target === game.player)) {
+                        if(Math.hypot(enemy.x - this.x, enemy.y - this.y) < 300) {
+                            this.state = 'attack'; this.target = enemy;
+                        }
+                    }
+                });
+            }
+        }
+
+        let pdx = game.player.x - this.x, pdy = game.player.y - this.y;
+        let dist = Math.sqrt(pdx*pdx + pdy*pdy);
+        let detectionRange = 300 - (game.player.stats.sneaky * 5); 
+
+        if(this.type === 'police') {
+            if(game.player.wanted > 0 && dist < detectionRange) { this.state = 'attack'; this.target = game.player; }
+            else this.state = 'idle';
+        }
+
+        if(this.state === 'idle') {
+            if(Math.random() < 0.02) this.angle = Math.random() * Math.PI * 2;
+            if(Math.random() < 0.2) {
+                let nx = this.x + Math.cos(this.angle) * this.speed * 0.5;
+                let ny = this.y + Math.sin(this.angle) * this.speed * 0.5;
+                if(!checkWallCollision(nx, ny)) { this.x = nx; this.y = ny; }
+            }
+        } else if(this.state === 'flee') {
+            this.angle = Math.atan2(pdy, pdx) + Math.PI;
+            let nx = this.x + Math.cos(this.angle) * 3;
+            let ny = this.y + Math.sin(this.angle) * 3;
+            if(!checkWallCollision(nx, ny)) { this.x = nx; this.y = ny; }
+        } else if(this.state === 'attack') {
+            if(!this.target || this.target.dead) { this.state = 'idle'; return; }
+            let tdx = this.target.x - this.x, tdy = this.target.y - this.y;
+            this.angle = Math.atan2(tdy, tdx);
+            dist = Math.hypot(tdx, tdy);
+            
+            let chaseDist = (this.weapon === 'fists' || this.type === 'dog') ? 30 : 200;
+            if(dist > chaseDist) {
+                let nx = this.x + Math.cos(this.angle) * this.speed;
+                let ny = this.y + Math.sin(this.angle) * this.speed;
+                if(!checkWallCollision(nx, ny)) { this.x = nx; this.y = ny; }
+            }
+            if(dist < 500 && this.shootTimer <= 0) {
+                if((this.weapon === 'fists' || this.type === 'dog') && dist < 50) {
+                    if(this.target === game.player) game.player.hp -= 5;
+                    else this.target.hp -= 5;
+                    this.shootTimer = 60;
+                } else if (this.weapon !== 'fists') {
+                    shootBullet(this, this.angle, this.weapon); this.shootTimer = 100;
+                }
+            }
+            this.shootTimer--;
+        }
+    }
+}
+
+// --- GAME LOGIC ---
+function startGame() {
+    document.getElementById('main-menu').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    speak("", 1);
+    generateMap();
+    for(let i=0; i<100; i++) {
+        let x, y; do { x = Math.random()*MAP_WIDTH*TILE_SIZE; y = Math.random()*MAP_HEIGHT*TILE_SIZE; } while(checkWallCollision(x, y));
+        game.entities.push(new Entity(x, y, 'civ'));
+    }
+    for(let i=0; i<10; i++) {
+        let x, y; do { x = Math.random()*MAP_WIDTH*TILE_SIZE; y = Math.random()*MAP_HEIGHT*TILE_SIZE; } while(checkWallCollision(x, y));
+        game.entities.push(new Entity(x, y, 'dog'));
+    }
+    game.active = true;
+    requestAnimationFrame(gameLoop);
+}
+
+function checkWallCollision(x, y) {
+    if(game.player.location === 'inside') {
+        return x < 300 || x > 700 || y < 200 || y > 500;
+    }
+    let tx = Math.floor(x/TILE_SIZE), ty = Math.floor(y/TILE_SIZE);
+    if(tx<0||tx>=MAP_WIDTH||ty<0||ty>=MAP_HEIGHT) return true;
+    return game.map[ty][tx] === 2;
+}
+
+function performAttack() {
+    let w = Weapons[game.player.weapon];
+    if(game.player.shootCooldown > 0) return;
+    if(w.type === 'melee') {
+        game.player.shootCooldown = (w.delay - (game.player.stats.aim * 10)) / 16;
+        let dmg = w.damage + (game.player.stats.strength * 2);
+        game.entities.forEach(ent => {
+            if(ent.dead) return;
+            if(Math.hypot(ent.x - game.player.x, ent.y - game.player.y) < w.range) {
+                ent.hp -= dmg; ent.state = 'attack'; ent.target = game.player;
+                if(game.player.location === 'inside' && game.player.buildingType !== 'gym') triggerAggro();
+                if(ent.hp <= 0) killEntity(ent);
+            }
+        });
+    } else {
+        if(game.player.clip[game.player.weapon] > 0) {
+            shootBullet(game.player, game.player.angle, game.player.weapon);
+            game.player.clip[game.player.weapon]--;
+            if(Math.random() < 0.2) game.player.wanted += 0.3;
+             game.player.shootCooldown = (w.delay - (game.player.stats.aim * 5)) / 16;
+        }
+    }
+}
+
+function shootBullet(owner, angle, weaponName) {
+    let speed = 15; let weapon = Weapons[weaponName];
+    if(owner === game.player && game.player.drunkLevel > 0) angle += (Math.random() - 0.5) * (game.player.drunkLevel * 0.5);
+    game.bullets.push({
+        x: owner.x, y: owner.y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
+        owner: owner===game.player?'player':'enemy', damage: weapon.damage, type: weapon.type, life: 60
+    });
+}
+
+function killEntity(ent) {
+    ent.dead = true; 
+    if(ent.type !== 'ally') game.player.wanted += (ent.type==='police'?1.5:1);
+    game.particles.push({x:ent.x, y:ent.y, life:300, type:'money'});
+}
+
+function triggerAggro() {
+    game.entities.forEach(ent => { if(!ent.dead && ent.type !== 'ally') { ent.state = 'attack'; ent.target = game.player; } });
+}
+
+// --- INTERACTION ---
+function startGym() {
+    game.gym.active = true;
+    game.gym.clicks = 0;
+    game.gym.timer = game.gym.maxTime; 
+    document.getElementById('gym-overlay').style.display = 'flex';
+    document.getElementById('gym-bar').style.width = '0%';
+    think("Time to get huge.");
+}
+
+function updateGym() {
+    game.gym.timer--;
+    let progress = (game.gym.clicks / game.gym.requiredClicks) * 100;
+    if(progress > 100) progress = 100;
+    document.getElementById('gym-bar').style.width = progress + '%';
+
+    if(game.gym.timer <= 0) {
+        let gains = Math.floor(game.gym.clicks / 5);
+        let stat = game.gym.stats[game.gym.selectedStat];
+        if(stat === 'STRENGTH') game.player.stats.strength += gains;
+        if(stat === 'SPEED') game.player.stats.speed += (gains * 0.1);
+        if(stat === 'SNEAKY') game.player.stats.sneaky += gains;
+        if(stat === 'AIM') game.player.stats.aim += gains;
+        
+        game.gym.active = false;
+        document.getElementById('gym-overlay').style.display = 'none';
+        showDialogue("Trainer", "Set complete! +" + gains + " " + stat, 3000, null);
+    }
+}
+
+function enterBuilding(b) {
+    game.player.location = 'inside'; game.player.buildingId = b.id; game.player.buildingType = b.type;
+    game.player.savedX = game.player.x; game.player.savedY = game.player.y;
+    game.player.x = 500; game.player.y = 450;
+    game.camera.x = 500 - (canvas.width/ZOOM)/2; game.camera.y = 350 - (canvas.height/ZOOM)/2;
+    
+    if(b.type === 'club') { think("This music is loud!"); }
+    if(b.type === 'gym') { think("Press O to train."); }
+    if(b.type === 'pizza') { think("Press Space to start shift."); }
+    
+    if(b.type === 'house') {
+        let p = new Entity(500, 300, 'civ'); p.type = 'patron'; p.bravery = 1.0; game.entities.push(p);
+        setTimeout(() => { showDialogue("Owner", "GET OUT!", 2000, p); triggerAggro(); }, 500);
+        game.particles.push({x: 400, y: 300, life: 1000, type: 'money'});
+        let d = new Entity(550, 320, 'dog'); d.isIndoorDog = true; game.entities.push(d);
+    }
+    if(b.type === 'bar' || b.type === 'club' || b.type === 'pizza') {
+        for(let i=0; i<5; i++) {
+            let ex = 350 + Math.random() * 300; let ey = 250 + Math.random() * 200;
+            let p = new Entity(ex, ey, 'civ'); p.type = 'patron'; game.entities.push(p);
+        }
+    }
+}
+function exitBuilding() {
+    game.player.location = 'outside'; game.player.x = game.player.savedX; game.player.y = game.player.savedY + 30;
+    game.entities = game.entities.filter(e => e.type !== 'patron' && !e.isIndoorDog);
+    game.gym.active = false; document.getElementById('gym-overlay').style.display = 'none';
+}
+
+function buyItem(item, price) {
+    if(game.player.money >= price) {
+        game.player.money -= price;
+        if(item === 'ammo_pistol') game.player.ammo.pistol += 12;
+        if(item === 'ammo_ak') game.player.ammo.ak47 += 30;
+        if(item === 'ammo_rpg') game.player.ammo.rpg += 1;
+        if(item === 'medkit') game.player.hp = game.player.maxHp;
+    } else alert("Not enough cash!");
+}
+function buyDrink(type, cost) {
+    if(game.player.money >= cost) {
+        game.player.money -= cost; game.player.drunkLevel += (type === 'vodka' ? 5 : 1);
+        showDialogue("Bartender", "Here you go.", 1500, null);
+    } else alert("You're broke!");
+}
+function think(text) { game.innerThought.text = text; game.innerThought.timer = 180; }
+
+// --- PHONE & MAP ---
+function togglePhone() {
+    game.phoneOpen = !game.phoneOpen;
+    let ui = document.getElementById('phone-ui');
+    if(game.phoneOpen) {
+        ui.classList.add('active');
+        let list = document.getElementById('contact-list'); list.innerHTML = '';
+        game.friends.forEach(f => {
+            let d = document.createElement('div'); d.className = 'contact-item'; 
+            d.innerHTML = `<span>${f}</span><span class='call-btn' onclick="callBackup('${f}')">📞</span>`;
+            list.appendChild(d);
+        });
+    } else { ui.classList.remove('active'); }
+}
+
+function callBackup(name) {
+    togglePhone();
+    showDialogue(name, "I'm on my way!", 2000, null);
+    let a = new Entity(game.player.x + 50, game.player.y, 'ally');
+    a.weapon = 'pistol';
+    game.entities.push(a);
+}
+
+// Map Logic
+function toggleMap() {
+    game.paused = !game.paused;
+    document.getElementById('pause-menu').style.display = game.paused ? 'flex' : 'none';
+    if(game.paused) drawMiniMap();
+}
+
+function drawMiniMap() {
+    let mc = document.getElementById('map-canvas');
+    let mctx = mc.getContext('2d');
+    let scaleX = mc.width / (MAP_WIDTH * TILE_SIZE);
+    let scaleY = mc.height / (MAP_HEIGHT * TILE_SIZE);
+    mctx.fillStyle = '#222'; mctx.fillRect(0, 0, mc.width, mc.height);
+    
+    game.map.forEach((row, r) => {
+        row.forEach((tile, c) => {
+            if(tile === 1) { mctx.fillStyle = '#444'; mctx.fillRect(c*TILE_SIZE*scaleX, r*TILE_SIZE*scaleY, 4, 4); }
+        });
+    });
+    
+    game.buildings.forEach(b => {
+        if(b.type === 'gym') mctx.fillStyle = '#3498db';
+        else if(b.type === 'pizza') mctx.fillStyle = '#e67e22';
+        else if(b.type === 'gunshop') mctx.fillStyle = '#9b59b6';
+        else if(b.type === 'bar') mctx.fillStyle = '#795548';
+        else mctx.fillStyle = '#7f8c8d';
+        mctx.fillRect(b.x*scaleX, b.y*scaleY, b.w*scaleX, b.h*scaleY);
+    });
+    
+    mctx.fillStyle = '#e74c3c'; mctx.beginPath(); mctx.arc(game.player.x*scaleX, game.player.y*scaleY, 5, 0, Math.PI*2); mctx.fill();
+    if(game.gps.x) { mctx.fillStyle = '#f1c40f'; mctx.beginPath(); mctx.arc(game.gps.x*scaleX, game.gps.y*scaleY, 5, 0, Math.PI*2); mctx.fill(); }
+}
+
+document.getElementById('map-canvas').addEventListener('mousedown', e => {
+    let rect = e.target.getBoundingClientRect();
+    let x = e.clientX - rect.left; let y = e.clientY - rect.top;
+    let scaleX = (MAP_WIDTH * TILE_SIZE) / e.target.width; let scaleY = (MAP_HEIGHT * TILE_SIZE) / e.target.height;
+    game.gps.x = x * scaleX; game.gps.y = y * scaleY;
+    drawMiniMap();
+});
+
+// --- INTERACTION MENU ---
+function openInteractionMenu(target) {
+    game.interaction.active = true; game.interaction.target = target; game.interaction.selectedIndex = 0;
+    
+    let opts = [];
+    if(game.player.location === 'inside' && game.player.buildingType !== 'house') {
+        opts = [{ text: "ROB STORE", action: 'rob_store' }];
+    } else {
+        opts = [
+            { text: "Greet", action: 'greet' },
+            { text: "Make Friend", action: 'friend' },
+            { text: "Insult", action: 'insult' },
+            { text: "ROB (Threaten)", action: 'rob' }
+        ];
+    }
+    if(target && target.type === 'customer') opts = [{text: "DELIVER PIZZA", action: 'deliver'}];
+
+    game.interaction.options = opts;
+    
+    const list = document.getElementById('interaction-list'); list.innerHTML = '';
+    opts.forEach((opt, index) => {
+        let div = document.createElement('div'); div.className = 'interaction-option' + (index === 0 ? ' selected' : '');
+        div.innerText = opt.text; div.onclick = () => confirmInteraction(index); list.appendChild(div);
+    });
+    document.getElementById('interaction-menu').style.display = 'block';
+    if(target) target.angle = Math.atan2(game.player.y - target.y, game.player.x - target.x);
+}
+function closeInteractionMenu() {
+    game.interaction.active = false; game.interaction.target = null;
+    document.getElementById('interaction-menu').style.display = 'none';
+}
+function confirmInteraction(index) {
+    if(!game.interaction.active) return;
+    let action = game.interaction.options[index].action; let target = game.interaction.target;
+    closeInteractionMenu();
+    
+    if(action === 'deliver') {
+        showDialogue("Customer", "Pizza time! Thanks.", 2000, target);
+        game.entities = game.entities.filter(e => e !== target);
+        game.job.active = false; game.gps.x = null; game.job.customerEntity = null;
+        game.player.money += 150;
+        return;
+    }
+    
+    if(action === 'rob_store') {
+        showDialogue("Player", "OPEN THE REGISTER!", 1500, game.player);
+        setTimeout(() => {
+            game.player.wanted = 3; game.player.money += 500;
+            showDialogue("Clerk", "Take it all! Please!", 2000, null);
+            game.entities.forEach(e => { if(e.type==='ally') e.state='attack'; });
+        }, 1500);
+        return;
+    }
+
+    if (action === 'greet') showDialogue("Civilian", "Hello there.", 2000, target);
+    else if (action === 'friend') {
+        if(Math.random() > 0.6) { showDialogue("Civilian", "Sure, I'll add you!", 2000, target); game.friends.push("Friend "+Math.floor(Math.random()*100)); } 
+        else showDialogue("Civilian", "I don't know you.", 2000, target);
+    }
+    else if (action === 'insult') { showDialogue("Civilian", "You wanna go?!", 2000, target); target.state = 'attack'; }
+    else if (action === 'rob') {
+        showDialogue("Player", "GIVE ME THE MONEY!", 1500, game.player);
+        setTimeout(() => {
+            if(target.dead) return;
+            if(target.bravery < 0.6) {
+                let loot = Math.floor(Math.random() * 80) + 20; game.player.money += loot;
+                showDialogue("Civilian", "Take it!", 3000, target); target.state = 'flee'; game.player.wanted += 0.5;
+            } else { showDialogue("Civilian", "No way!", 2000, target); target.weapon = 'fists'; target.state = 'attack'; }
+        }, 1500);
+    }
+}
+function showDialogue(speaker, text, duration, entity) {
+    let box = document.getElementById('dialogue-box');
+    document.getElementById('dialogue-speaker').textContent = speaker; document.getElementById('dialogue-text').textContent = text;
+    box.style.display = 'block';
+    let pitch = (entity && entity.pitch) ? entity.pitch : 1.0; if(speaker === 'Player') pitch = 0.8;
+    speak(text, pitch);
+    clearTimeout(game.dialogue.timer); game.dialogue.timer = setTimeout(() => { box.style.display = 'none'; }, duration);
+}
+function tryInteract() {
+    // 1. Enter Building
+    if(game.player.location === 'outside') {
+        for(let b of game.buildings) { if(Math.hypot(game.player.x - b.doorX, game.player.y - b.doorY) < 60) { enterBuilding(b); return; } }
+    } else {
+        // 2. Start Job (Inside)
+        if(game.player.buildingType === 'pizza' && game.player.y < 280) { startJob('pizza'); return; }
+        exitBuilding();
+    }
+    
+    // 3. NPC Interaction
+    if(!game.interaction.active) {
+        if(game.player.location === 'inside' && (game.player.buildingType === 'bar' || game.player.buildingType === 'gunshop' || game.player.buildingType === 'pizza')) {
+             openInteractionMenu(null); return;
+        }
+        
+        let closest = null; let minDist = 80;
+        game.entities.forEach(ent => {
+            if(ent.dead || ent.type === 'police' || ent.type === 'dog') return;
+            let d = Math.hypot(ent.x - game.player.x, ent.y - game.player.y);
+            if(d < minDist) { minDist = d; closest = ent; }
+        });
+        if(closest) { openInteractionMenu(closest); return; }
+    } else if (game.interaction.active) confirmInteraction(game.interaction.selectedIndex);
+}
+
+function startJob(type) {
+    if(type === 'pizza') {
+        game.job.active = true;
+        let houses = game.buildings.filter(b => b.type === 'house');
+        let target = houses[Math.floor(Math.random()*houses.length)];
+        game.job.targetX = target.doorX; game.job.targetY = target.doorY;
+        game.gps.x = target.doorX; game.gps.y = target.doorY;
+        showDialogue("Boss", "Deliver this to the location on your GPS!", 2000, null);
+        
+        // Spawn Customer
+        let cust = new Entity(target.doorX, target.doorY + 40, 'civ');
+        cust.type = 'customer'; cust.state = 'waiting';
+        game.entities.push(cust);
+        game.job.customerEntity = cust;
+    }
+}
+
+function checkJobCompletion() {
+    // Moved to interaction menu logic ("Deliver Pizza" option)
+}
+
+function enterBuilding(b) {
+    game.player.location = 'inside'; game.player.buildingId = b.id; game.player.buildingType = b.type;
+    game.player.savedX = game.player.x; game.player.savedY = game.player.y;
+    game.player.x = 500; game.player.y = 450;
+    game.camera.x = 500 - (canvas.width/ZOOM)/2; game.camera.y = 350 - (canvas.height/ZOOM)/2;
+    
+    if(b.type === 'club') think("This music is loud!"); 
+    if(b.type === 'gym') think("Press O to train."); 
+    if(b.type === 'pizza') think("Press Space to start shift.");
+    
+    if(b.type === 'house') {
+        let p = new Entity(500, 300, 'civ'); p.type = 'patron'; p.bravery = 1.0; game.entities.push(p);
+        setTimeout(() => { showDialogue("Owner", "GET OUT!", 2000, p); triggerAggro(); }, 500);
+        game.particles.push({x: 400, y: 300, life: 1000, type: 'money'});
+        let d = new Entity(550, 320, 'dog'); d.isIndoorDog = true; game.entities.push(d);
+    }
+    if(b.type === 'bar' || b.type === 'club' || b.type === 'pizza') {
+        for(let i=0; i<5; i++) {
+            let ex = 350 + Math.random() * 300; let ey = 250 + Math.random() * 200;
+            let p = new Entity(ex, ey, 'civ'); p.type = 'patron'; game.entities.push(p);
+        }
+    }
+}
+function exitBuilding() {
+    game.player.location = 'outside'; game.player.x = game.player.savedX; game.player.y = game.player.savedY + 30;
+    game.entities = game.entities.filter(e => e.type !== 'patron' && !e.isIndoorDog);
+    game.gym.active = false; document.getElementById('gym-overlay').style.display = 'none';
+}
+
+function buyItem(item, price) {
+    if(game.player.money >= price) {
+        game.player.money -= price;
+        if(item === 'ammo_pistol') game.player.ammo.pistol += 12;
+        if(item === 'ammo_ak') game.player.ammo.ak47 += 30;
+        if(item === 'ammo_rpg') game.player.ammo.rpg += 1;
+        if(item === 'medkit') game.player.hp = game.player.maxHp;
+    } else alert("Not enough cash!");
+}
+function buyDrink(type, cost) {
+    if(game.player.money >= cost) {
+        game.player.money -= cost; game.player.drunkLevel += (type === 'vodka' ? 5 : 1);
+        showDialogue("Bartender", "Here you go.", 1500, null);
+    } else alert("You're broke!");
+}
+function think(text) { game.innerThought.text = text; game.innerThought.timer = 180; }
+
+// --- INPUTS ---
+window.addEventListener('keydown', e => {
+    game.keys[e.key.toLowerCase()] = true;
+    if(e.code === 'Space') { e.preventDefault(); tryInteract(); }
+    if(e.key.toLowerCase() === 'e') {
+        if(game.player.location === 'inside') {
+             let b = game.buildings.find(b => b.id === game.player.buildingId);
+             if(b && b.type === 'gunshop') { document.getElementById('shop-ui').style.display = 'block'; game.active = false; return; }
+             if(b && b.type === 'bar') { document.getElementById('bar-ui').style.display = 'block'; game.active = false; return; }
+        }
+        tryInteract();
+    }
+    if(e.key.toLowerCase() === 'o') { if(game.player.location === 'inside' && game.player.buildingType === 'gym') startGym(); }
+    if(e.key.toLowerCase() === 'k') togglePhone();
+    if(e.key.toLowerCase() === 'm') toggleMap();
+    if(e.key.toLowerCase() === 'g') {
+        let closestAlly = game.entities.find(e => e.type === 'ally' && Math.hypot(e.x - game.player.x, e.y - game.player.y) < 100);
+        if(closestAlly) { closestAlly.weapon = game.player.weapon; showDialogue("Ally", "Thanks for the piece!", 1500, closestAlly); }
+    }
+    if(e.key === 'r') reload();
+    if(e.key === '1') game.player.weapon = 'fists';
+    if(e.key === '2') game.player.weapon = 'pistol';
+    if(e.key === '3') game.player.weapon = 'ak47';
+    if(e.key === '4') game.player.weapon = 'rpg';
+    if(e.key === 'Escape') {
+        document.querySelectorAll('.modal-ui').forEach(el => el.style.display = 'none');
+        closeInteractionMenu();
+        if(game.paused) toggleMap();
+        game.active = true;
+        requestAnimationFrame(gameLoop);
+    }
+});
+
+window.addEventListener('wheel', e => {
+    if(game.gym.active) {
+        e.preventDefault();
+        if(e.deltaY > 0) game.gym.selectedStat = (game.gym.selectedStat + 1) % game.gym.stats.length;
+        else game.gym.selectedStat = (game.gym.selectedStat - 1 + game.gym.stats.length) % game.gym.stats.length;
+        document.getElementById('gym-stat-text').innerText = "Target: " + game.gym.stats[game.gym.selectedStat];
+        return;
+    }
+    if(game.interaction.active) {
+        e.preventDefault();
+        if(e.deltaY > 0) game.interaction.selectedIndex = (game.interaction.selectedIndex + 1) % game.interaction.options.length;
+        else game.interaction.selectedIndex = (game.interaction.selectedIndex - 1 + game.interaction.options.length) % game.interaction.options.length;
+        let list = document.getElementById('interaction-list').children;
+        for(let i=0; i<list.length; i++) list[i].className = 'interaction-option' + (i === game.interaction.selectedIndex ? ' selected' : '');
+    }
+}, {passive: false});
+
+window.addEventListener('keyup', e => game.keys[e.key.toLowerCase()] = false);
+canvas.addEventListener('mousemove', e => { game.mouse.x = e.clientX / ZOOM; game.mouse.y = e.clientY / ZOOM; });
+canvas.addEventListener('mousedown', () => { 
+    if(game.gym.active) game.gym.clicks++; 
+    else if(!game.interaction.active) game.mouse.down = true; 
+});
+canvas.addEventListener('mouseup', () => game.mouse.down = false);
+
+function reload() {
+    let w = game.player.weapon; if(w === 'fists') return;
+    let clipNeeded = Weapons[w].clipSize - game.player.clip[w];
+    if(clipNeeded > 0 && game.player.ammo[w] > 0) {
+        let amount = Math.min(clipNeeded, game.player.ammo[w]);
+        game.player.clip[w] += amount; game.player.ammo[w] -= amount;
+    }
+}
+
+// --- RENDER & LOOP ---
+function drawEntity(ent, isPlayer) {
+    let x = ent.x - game.camera.x, y = ent.y - game.camera.y;
+    let angle = ent.angle;
+    if(isPlayer) angle = Math.atan2(game.mouse.y - (y + ent.h/2), game.mouse.x - (x + ent.w/2));
+    else if(game.interaction.active && game.interaction.target === ent) angle = Math.atan2(game.player.y - ent.y, game.player.x - ent.x);
+    ent.angle = angle;
+
+    let img = isPlayer ? images.player : images[ent.imgKey];
+    ctx.save(); ctx.translate(x + ent.w/2, y + ent.h/2); ctx.rotate(angle);
+    if(img && img.complete) ctx.drawImage(img, -ent.w/2, -ent.h/2, ent.w, ent.h);
+    else { ctx.fillStyle = isPlayer?'orange':'blue'; ctx.fillRect(-ent.w/2, -ent.h/2, ent.w, ent.h); }
+    if(ent.weapon !== 'fists' && ent.type !== 'dog') {
+        let gunImg = images[Weapons[ent.weapon].img];
+        if(gunImg && gunImg.complete) ctx.drawImage(gunImg, 5, -10, 30, 20);
+    }
+    ctx.restore();
+    if(isPlayer && game.innerThought.timer > 0) {
+        ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.font = "italic 12px Arial"; ctx.fillText(game.innerThought.text, x, y - 20); game.innerThought.timer--;
+    }
+    
+    // Name tags
+    if(ent.type === 'ally') { ctx.fillStyle = '#2ecc71'; ctx.font = '10px Arial'; ctx.fillText("ALLY", x, y - 10); }
+    if(ent.type === 'customer') { ctx.fillStyle = '#f1c40f'; ctx.font = '10px Arial'; ctx.fillText("CUSTOMER", x, y - 10); }
+
+    if(!isPlayer && ent.hp < 40 && !ent.dead) {
+        ctx.fillStyle = 'red'; ctx.fillRect(x, y-10, 40, 4); ctx.fillStyle = '#2ecc71'; ctx.fillRect(x, y-10, 40 * (ent.hp/40), 4);
+    }
+}
+
+function gameLoop() {
+    if(!game.active || game.paused) return;
+    if(game.gym.active) { updateGym(); requestAnimationFrame(gameLoop); return; }
+    
+    // Player Move
+    if(!game.interaction.active) {
+        let moveSpeed = (game.keys['q'] ? (BASE_SPEED * RUN_SPEED_MOD) : BASE_SPEED) + game.player.stats.speed;
+        if(game.player.drunkLevel > 0) { moveSpeed *= 0.8; if(Math.random() < 0.1) game.player.angle += 0.5; }
+        if(game.keys['q']) game.player.stamina -= 0.5; else if(game.player.stamina<100) game.player.stamina+=0.2;
+        if(game.player.stamina<=0) moveSpeed = BASE_SPEED;
+        
+        let dx = 0, dy = 0;
+        if(game.keys['w']) dy = -1; if(game.keys['s']) dy = 1; if(game.keys['a']) dx = -1; if(game.keys['d']) dx = 1;
+        let nx = game.player.x + dx * moveSpeed, ny = game.player.y + dy * moveSpeed;
+        if(!checkWallCollision(nx, game.player.y)) game.player.x = nx;
+        if(!checkWallCollision(game.player.x, ny)) game.player.y = ny;
+        if(game.player.location === 'inside' && game.player.y > 480) exitBuilding();
+        
+        if(game.player.shootCooldown > 0) game.player.shootCooldown--;
+        if(game.mouse.down) performAttack();
+    }
+    
+    if(game.player.drunkLevel > 0 && Math.random() < 0.001) game.player.drunkLevel--;
+    
+    // CAMERA
+    if(game.player.location === 'outside') {
+        let viewW = canvas.width / ZOOM; let viewH = canvas.height / ZOOM;
+        game.camera.x = Math.max(0, Math.min(game.player.x - viewW/2, MAP_WIDTH*TILE_SIZE - viewW));
+        game.camera.y = Math.max(0, Math.min(game.player.y - viewH/2, MAP_HEIGHT*TILE_SIZE - viewH));
+    } else {
+        game.camera.x = 500 - (canvas.width/ZOOM)/2; game.camera.y = 350 - (canvas.height/ZOOM)/2;
+    }
+    
+    game.entities.forEach(ent => ent.update());
+    
+    game.traffic.forEach(car => {
+        car.x += car.vx; car.y += car.vy;
+        if(car.x < 0) car.x = MAP_WIDTH*TILE_SIZE; if(car.x > MAP_WIDTH*TILE_SIZE) car.x = 0;
+        if(car.y < 0) car.y = MAP_HEIGHT*TILE_SIZE; if(car.y > MAP_HEIGHT*TILE_SIZE) car.y = 0;
+        if(Math.abs(car.x - game.player.x) < 30 && Math.abs(car.y - game.player.y) < 30) {
+            game.player.hp -= 5; game.player.x += car.vx * 2; game.player.y += car.vy * 2;
+        }
+    });
+    game.trains.forEach(t => {
+        t.x += t.speed; if(t.x > MAP_WIDTH*TILE_SIZE) t.x = -200;
+        if(Math.abs(t.x - game.player.x) < 100 && Math.abs(t.y - game.player.y) < 50) game.player.hp = 0; 
+    });
+    
+    if(game.player.wanted >= 3 && game.helicopters.length === 0) game.helicopters.push({x: game.player.x, y: game.player.y - 400, angle: 0, timer: 0});
+    game.helicopters.forEach(h => {
+        let dx = game.player.x - h.x; let dy = game.player.y - h.y; h.x += dx * 0.02; h.y += dy * 0.02; h.timer++;
+        if(h.timer % 30 === 0 && Math.hypot(dx,dy) < 400) shootBullet(h, Math.atan2(dy, dx), 'ak47');
+    }); if(game.player.wanted < 3) game.helicopters = [];
+
+    for(let i=game.bullets.length-1; i>=0; i--) {
+        let b = game.bullets[i]; b.x += b.vx; b.y += b.vy; b.life--;
+        if(checkWallCollision(b.x, b.y)) b.life = 0;
+        let targets = b.owner === 'player' ? game.entities : [game.player];
+        targets.forEach(t => {
+            if(t.dead || (t===game.player && b.owner==='player')) return;
+            if(Math.hypot(t.x - b.x, t.y - b.y) < 25) {
+                t.hp -= b.damage; b.life = 0;
+                if(b.type === 'explosive') { game.particles.push({x:b.x, y:b.y, type:'explosion', life:20}); t.hp -= 100; }
+                if(t.hp <= 0 && t !== game.player) killEntity(t);
+                else if(t !== game.player) { t.state = 'attack'; t.target = game.player; }
+            }
+        });
+        if(b.life <= 0) game.bullets.splice(i, 1);
+    }
+    
+    if(game.player.wanted > 0) {
+        let desired = Math.floor(game.player.wanted * 2);
+        if(game.entities.filter(e => e.type === 'police' && !e.dead).length < desired && Math.random()<0.05) {
+            let angle = Math.random()*Math.PI*2; let dist = 700;
+            game.entities.push(new Entity(game.player.x+Math.cos(angle)*dist, game.player.y+Math.sin(angle)*dist, 'police'));
+        }
+    }
+
+    // --- DRAW ---
+    ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save(); ctx.scale(ZOOM, ZOOM);
+
+    if(game.player.drunkLevel > 0) { let w = Math.sin(Date.now()/500)*(game.player.drunkLevel*2); ctx.translate(w, w); }
+
+    if(game.player.location === 'outside') {
+        let sc = Math.floor(game.camera.x/TILE_SIZE), ec = sc + Math.ceil((canvas.width/ZOOM)/TILE_SIZE)+1;
+        let sr = Math.floor(game.camera.y/TILE_SIZE), er = sr + Math.ceil((canvas.height/ZOOM)/TILE_SIZE)+1;
+        for(let c=sc; c<=ec; c++) for(let r=sr; r<=er; r++) {
+            if(c>=0 && c<MAP_WIDTH && r>=0 && r<MAP_HEIGHT) {
+                let t = game.map[r][c];
+                let tx = c*TILE_SIZE-game.camera.x, ty = r*TILE_SIZE-game.camera.y;
+                if(t===0) ctx.fillStyle=Colors.grass;
+                else if(t===3) { ctx.fillStyle='#5d4037'; ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE); ctx.fillStyle='#2c3e50'; ctx.fillRect(tx, ty+10, TILE_SIZE, 5); ctx.fillRect(tx, ty+35, TILE_SIZE, 5); }
+                else if(t===1) { ctx.fillStyle=Colors.road; ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE); ctx.fillStyle=Colors.pavement; ctx.fillRect(tx, ty, 5, TILE_SIZE); ctx.fillRect(tx+45, ty, 5, TILE_SIZE); ctx.fillStyle='#f1c40f'; ctx.fillRect(tx+22, ty+10, 6, 30); } 
+                else ctx.fillStyle=Colors.wall;
+                if(t!==1 && t!==3) ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
+            }
+        }
+        
+        game.buildings.forEach(b => {
+            if(b.x+b.w>game.camera.x && b.x<game.camera.x+(canvas.width/ZOOM) && b.y+b.h>game.camera.y && b.y<game.camera.y+(canvas.height/ZOOM)) {
+                let img = b.imgKey ? images[b.imgKey] : null;
+                if(img && img.complete) ctx.drawImage(img, b.x-game.camera.x, b.y-game.camera.y, b.w, b.h);
+                else { ctx.fillStyle=b.color; ctx.fillRect(b.x-game.camera.x, b.y-game.camera.y, b.w, b.h); }
+                ctx.fillStyle='#000'; ctx.fillRect(b.doorX-15-game.camera.x, b.doorY-10-game.camera.y, 30, 10);
+                let lbl = ""; if(b.type==='gunshop') lbl="GUNS"; if(b.type==='gym') lbl="GYM"; if(b.type==='bar') lbl="BAR"; if(b.type==='police') lbl="POLICE"; if(b.type==='pizza') lbl="PIZZA";
+                if(lbl) { ctx.fillStyle='#fff'; ctx.font='bold 16px Russo One'; ctx.fillText(lbl, b.x-game.camera.x+10, b.y-game.camera.y+30); }
+            }
+        });
+        
+        game.trains.forEach(t => { ctx.fillStyle='#e74c3c'; ctx.fillRect(t.x-game.camera.x, t.y-game.camera.y, t.w, t.h); });
+        game.traffic.forEach(c => { ctx.fillStyle=c.color; ctx.fillRect(c.x-game.camera.x, c.y-game.camera.y, c.w, c.h); });
+        
+        if(game.gps.x !== null) {
+            let dx = game.gps.x - game.player.x; let dy = game.gps.y - game.player.y;
+            let angle = Math.atan2(dy, dx);
+            let px = game.player.x - game.camera.x; let py = game.player.y - game.camera.y;
+            ctx.save(); ctx.translate(px, py); ctx.rotate(angle);
+            ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(30, -10); ctx.lineTo(30, 10); ctx.fill();
+            ctx.restore();
+        }
+
+    } else {
+        ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width/ZOOM,canvas.height/ZOOM);
+        let bgImg = null;
+        if(game.player.buildingType === 'gym') bgImg = images.insidethegym;
+        if(game.player.buildingType === 'club') bgImg = images.insideclub;
+        let roomX = 300 - game.camera.x, roomY = 200 - game.camera.y;
+        if(bgImg && bgImg.complete && bgImg.naturalWidth !== 0) { ctx.drawImage(bgImg, roomX, roomY, 400, 300); } 
+        else { ctx.fillStyle='#2c3e50'; ctx.fillRect(roomX, roomY, 400, 300); }
+        if((!bgImg || !bgImg.complete) && game.player.buildingType === 'gym') {
+             ctx.fillStyle='#333'; ctx.fillRect(350-game.camera.x, 250-game.camera.y, 50, 100); 
+             ctx.fillStyle='#fff'; ctx.fillText("TRAINER", 500-game.camera.x, 240-game.camera.y);
+        }
+        ctx.fillStyle='#000'; ctx.fillRect(480-game.camera.x, 480-game.camera.y, 40, 20); 
+    }
+    
+    for(let i=game.particles.length-1; i>=0; i--) {
+        let p = game.particles[i]; p.life--;
+        if(p.type==='money'){ 
+            ctx.fillStyle='#2ecc71'; ctx.font='20px Arial'; 
+            if(p.life > 60 || p.life % 10 < 5) ctx.fillText("$", p.x-game.camera.x, p.y-game.camera.y); 
+            if(Math.hypot(p.x-game.player.x, p.y-game.player.y)<30) { game.player.money+=Math.floor(Math.random()*50)+20; p.life=0; } 
+        } else if(p.type==='explosion'){ ctx.fillStyle='#e67e22'; ctx.beginPath(); ctx.arc(p.x-game.camera.x, p.y-game.camera.y, 40, 0, Math.PI*2); ctx.fill(); }
+        if(p.life <= 0) game.particles.splice(i, 1);
+    }
+    
+    game.entities.forEach(ent => { if(!ent.dead) drawEntity(ent, false); });
+    drawEntity(game.player, true);
+    
+    game.helicopters.forEach(h => {
+        ctx.save(); ctx.translate(h.x-game.camera.x, h.y-game.camera.y); ctx.rotate(h.timer*0.5);
+        ctx.fillStyle='#333'; ctx.fillRect(-40, -5, 80, 10); ctx.fillRect(-5, -40, 10, 80); ctx.restore();
+        ctx.fillStyle='#2980b9'; ctx.fillRect(h.x-15-game.camera.x, h.y-15-game.camera.y, 30, 30);
+    });
+
+    game.bullets.forEach(b => { ctx.fillStyle=b.type==='explosive'?'#e74c3c':'#f1c40f'; ctx.fillRect(b.x-game.camera.x, b.y-game.camera.y, b.type==='explosive'?8:4, b.type==='explosive'?8:4); });
+
+    ctx.restore(); 
+
+    // UI Updates
+    document.getElementById('hp-fill').style.width = (game.player.hp / game.player.maxHp * 100) + '%';
+    document.getElementById('stamina-fill').style.width = game.player.stamina + '%';
+    document.getElementById('money-display').innerText = '$' + game.player.money;
+    document.getElementById('weapon-name').innerText = Weapons[game.player.weapon].name;
+    let wImg = document.getElementById('weapon-img-display');
+    if(game.player.weapon!=='fists') { wImg.src = images[Weapons[game.player.weapon].img].src; wImg.style.display='block'; document.getElementById('ammo-display').innerText=game.player.clip[game.player.weapon]+"/"+game.player.ammo[game.player.weapon]; }
+    else { wImg.style.display='none'; document.getElementById('ammo-display').innerText="∞"; }
+    let stars = document.getElementsByClassName('wanted-stars');
+    for(let i=0; i<5; i++) stars[i].className = i<Math.floor(game.player.wanted) ? 'wanted-stars active' : 'wanted-stars';
+
+    document.getElementById('job-panel').style.display = game.job.active ? 'block' : 'none';
+
+    let showPrompt = false; let promptText = "";
+    if(game.player.location === 'outside') {
+        for(let b of game.buildings) { if(Math.hypot(game.player.x-b.doorX, game.player.y-b.doorY)<60) { showPrompt=true; promptText = "<span class='key-hint'>E</span> ENTER"; } }
+    } else { if(game.player.y > 450) { showPrompt=true; promptText = "LEAVING..."; } }
+    if(showPrompt) { document.getElementById('prompt').innerHTML = promptText; document.getElementById('prompt').style.display='block'; }
+    else document.getElementById('prompt').style.display='none';
+
+    if(game.player.hp <= 0) { alert("WASTED!"); location.reload(); game.active = false; }
+    requestAnimationFrame(gameLoop);
+}
+</script>
+</body>
+</html>
